@@ -1,0 +1,202 @@
+import java.util.*;
+import java.sql.*;
+import java.time.format.*;
+import java.time.*;
+class Accounts
+{
+void displaytransactionhistory(int id)throws SQLException
+{
+    Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();
+    String tr="select transaction from users where id="+id;
+    ResultSet t=stmt.executeQuery(tr);
+    while(t.next())
+    {
+        System.out.println("--------------TRANSACTION HISTORY---------------");
+        System.out.println(t.getString("transaction").substring(5));
+    }
+}
+void updatetransactionhistory(int id,String amt)throws SQLException
+{
+        Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();
+        String tr="select transaction from users where id="+id;
+        String history="";
+        ResultSet t=stmt.executeQuery(tr);
+        while(t.next())
+        {
+            history=t.getString("transaction")+amt;
+        }
+        String update="update users set transaction='"+history+"' where id="+id;
+        int ct=stmt.executeUpdate(update);
+}
+boolean transfer(int id,int rid,double amt,double b)throws SQLException
+{
+    Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();
+    boolean check=withdraw(id,amt,b);
+    if(check)
+    {
+        updatetransactionhistory(rid,"\nCredit : "+amt);
+        String gt="select balance from users where id="+rid;
+        ResultSet r=stmt.executeQuery(gt);
+        while(r.next())
+        {
+        double bal=r.getDouble("balance");
+        System.out.println("Money successfully transferred .\n");
+        String upd="update users set balance="+(bal+amt)+"where id="+rid;
+        int c=stmt.executeUpdate(upd);
+        return true;
+        }   
+    }
+    return false;
+}
+boolean withdraw(int id,double cash,double b)throws SQLException
+{ 
+        Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();
+        if(cash>b)
+        {
+        System.out.println("Not enough balance.\nCurrent balance is : "+b);
+        return false;
+        }
+        b=b-cash;
+        String up="update users set balance="+b+"where id="+id;
+        int ub=stmt.executeUpdate(up);
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm yyyy/MM/dd");
+        updatetransactionhistory(id, "\nDebit : "+cash+" at "+dtf.format(LocalDateTime.now()));
+        System.out.println("Amount successfully withdrawn.");
+        System.out.println("Current bank balance is : "+b+"\n");
+        return true;
+    
+}
+void login(int userid,int password)
+{
+int ch=10;
+Scanner ob=new Scanner(System.in);
+try(Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();)
+{
+String strSelect="select id,name,balance from users where id="+userid+" AND pin="+password;
+ResultSet rset=stmt.executeQuery(strSelect);
+boolean t=rset.next();
+if(t==false)
+{
+    System.out.println("Wrong credentials.Please try again.\n");
+}
+else
+{
+int uid=rset.getInt("id");
+String name=rset.getString("name");
+double balance=rset.getDouble("balance");
+System.out.println("USER ID : "+uid+" \tNAME :"+name+" \tBALANCE:"+balance);
+while(ch!=5)
+{
+System.out.println("Enter 1 to see transaction history.\nEnter 2 to withdraw cash.\nEnter 3 to deposit cash.\nEnter 4 to transfer money.\nEnter 5 to QUIT.");
+ch=ob.nextInt();
+switch(ch)
+{
+    case 1:
+    displaytransactionhistory(uid);
+    break;
+    case 2:
+    System.out.println("Enter the amount of money to be withdrawn :");
+    double w=ob.nextDouble();
+    boolean c=withdraw(uid,w,balance);
+    if(c)
+    balance=balance-w;
+    break;
+    case 3:
+    System.out.println("Enter the amount to be deposited :");
+    double d=ob.nextDouble();
+    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm yyyy/MM/dd");
+    updatetransactionhistory(uid,"\nCredit : "+d+" at "+dtf.format(LocalDateTime.now()));
+    System.out.println("Money successfully deposited .");
+    String upd="update users set balance="+(balance+d)+"where id="+uid;
+    int ck=stmt.executeUpdate(upd);
+    System.out.println("Current bank balance is : "+(balance+d));
+    balance=balance+d;
+    break;
+    case 4:
+    System.out.println("Enter the amount of money to be transferred : ");
+    double sum=ob.nextDouble();
+    System.out.println("Enter the recipient uid :");
+    int r=ob.nextInt();
+    boolean che=transfer(uid,r,sum,balance);
+    if(che)
+    balance=balance-sum;
+    break;
+    default:
+    System.out.println("----------------------------------******-------------------------------\n");
+    System.out.println("Thanks for visiting the ATM. Don't share your id and pin with anyone.");
+    System.out.println("         Wear the mask and maintain social distancing.\n");
+    System.out.println("----------------------------------******-------------------------------\n");
+}
+}
+}
+}
+catch(SQLException ex)
+{
+System.out.println(ex);
+}
+}
+void signup(String name,int password,double deposit)
+{
+try(Connection conn=DriverManager.getConnection("jdbc:mysql://localhost:3306/userdata?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC","root","Hacker@9623");Statement stmt=conn.createStatement();)
+{
+int i=0;
+String strUpdate="insert into users (name,balance,pin) values ('"+name+"','"+deposit+"',"+password+")";
+int countUpdate=stmt.executeUpdate(strUpdate);
+System.out.println(countUpdate + " records affected.\n");
+String showsql="select id,name,balance from users where name='"+name+"' AND pin="+password;
+ResultSet r=stmt.executeQuery(showsql);
+while(r.next())
+{
+i=r.getInt("id");
+System.out.println("Account created successfully with userid "+i);
+System.out.println("Remember your userid for logging in again.\n");
+}
+updatetransactionhistory(i,"\nCredit : "+deposit);
+}
+catch(SQLException ex)
+{
+System.out.println(ex);
+}
+}
+}
+public class App
+{
+public static void main(String args[])
+{
+Scanner in=new Scanner(System.in);
+int choice=10;
+int pin;
+String name;
+double dep;
+System.out.println("--------------------WELCOME to the ATM INTERFACE-------------------");
+while(choice!=0)
+{
+System.out.println("Enter 1 to login and 2 to signup.(Enter 0 to exit the console)");
+choice=in.nextInt();
+Accounts a=new Accounts();
+switch(choice)
+{
+case 1:
+System.out.println("Enter your user ID:");
+int uid=in.nextInt();
+System.out.println("Enter your password: ");
+int pass=in.nextInt();
+a.login(uid,pass);
+break;
+case 2:
+System.out.println("Enter your name :");
+in.nextLine();
+name=in.nextLine();
+System.out.println("Enter a new pin for your account :");
+pin=in.nextInt();
+System.out.println("Enter the initial deposit amount :");
+dep=in.nextDouble();
+a.signup(name, pin, dep);
+break;
+default:
+System.out.println("----------------THANK YOU FOR VISITING----------------------");
+
+}
+}
+}
+}
